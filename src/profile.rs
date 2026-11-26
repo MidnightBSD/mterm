@@ -160,6 +160,9 @@ impl Default for TerminalProfile {
     }
 }
 
+/// Default terminal font size in points
+pub const DEFAULT_FONT_SIZE: f64 = 13.0;
+
 impl TerminalProfile {
     /// Default XFCE-Terminal inspired dark profile
     pub fn xfce_dark(emulation: EmulationType) -> Self {
@@ -167,7 +170,7 @@ impl TerminalProfile {
             name: format!("Default ({})", emulation.term_env()),
             emulation,
             font_family: "Monospace".to_string(),
-            font_size: 11.0,
+            font_size: DEFAULT_FONT_SIZE,
             foreground: RgbColor::new(230, 230, 230),
             background: RgbColor::new(24, 26, 31),
             cursor_color: RgbColor::new(82, 139, 255),

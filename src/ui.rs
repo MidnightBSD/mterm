@@ -826,8 +826,11 @@ pub fn create_new_tab(app_state: &Rc<RefCell<AppState>>, profile_override: Optio
     let tab_header = gtk4::Box::new(gtk4::Orientation::Horizontal, 6);
     let default_title = format!("Terminal {}", tab_id);
     let tab_label = gtk4::Label::new(Some(&default_title));
+    // An ellipsizing label's minimum width is just "…", and the scrollable notebook shrinks
+    // tabs to their minimum, so reserve room for a readable title.
     tab_label.set_ellipsize(pango::EllipsizeMode::End);
-    tab_label.set_max_width_chars(24);
+    tab_label.set_width_chars(28);
+    tab_label.set_max_width_chars(40);
 
     let rename_btn = gtk4::Button::builder()
         .icon_name("document-edit-symbolic")
@@ -1597,10 +1600,10 @@ fn build_xfce_menubar(app_state: &Rc<RefCell<AppState>>) -> gtk4::Box {
         let st3 = app_state.clone();
         add_item(
             &sub,
-            "Normal Size (11 pt)",
+            &format!("Normal Size ({} pt)", crate::profile::DEFAULT_FONT_SIZE),
             Box::new(move || {
                 let mut prof = st3.borrow().active_profile.clone();
-                prof.font_size = 11.0;
+                prof.font_size = crate::profile::DEFAULT_FONT_SIZE;
                 apply_profile_to_current_tab(&st3, prof);
             }),
         );
