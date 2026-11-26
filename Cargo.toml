@@ -2,6 +2,8 @@
 name = "mterm"
 version = "0.1.0"
 edition = "2024"
+license = "BSD-2-Clause"
+repository = "https://github.com/MidnightBSD/mterm"
 description = "Midnight Terminal: a GTK4 terminal emulator in Rust with OSC 52 remote copy/paste, profiles, and Unicode support"
 
 [dependencies]
