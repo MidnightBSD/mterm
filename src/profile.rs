@@ -227,6 +227,90 @@ impl TerminalProfile {
         p
     }
 
+    /// 80s amber monochrome monitor: black background, amber phosphor text, amber-tinted palette
+    pub fn amber(emulation: EmulationType) -> Self {
+        let mut p = Self::midnight_dark(emulation);
+        p.name = format!("Amber ({})", emulation.term_env());
+        p.foreground = RgbColor::new(255, 176, 0);
+        p.background = RgbColor::new(12, 8, 0);
+        p.cursor_color = RgbColor::new(255, 204, 51);
+        p.palette = [
+            RgbColor::new(40, 27, 0),     // 0: Black
+            RgbColor::new(214, 107, 0),   // 1: Red
+            RgbColor::new(204, 153, 0),   // 2: Green
+            RgbColor::new(230, 166, 0),   // 3: Yellow
+            RgbColor::new(170, 115, 10),  // 4: Blue
+            RgbColor::new(214, 125, 30),  // 5: Magenta
+            RgbColor::new(222, 162, 45),  // 6: Cyan
+            RgbColor::new(232, 172, 60),  // 7: White
+            RgbColor::new(140, 96, 0),    // 8: Bright Black
+            RgbColor::new(255, 128, 0),   // 9: Bright Red
+            RgbColor::new(255, 190, 0),   // 10: Bright Green
+            RgbColor::new(255, 210, 60),  // 11: Bright Yellow
+            RgbColor::new(214, 150, 30),  // 12: Bright Blue
+            RgbColor::new(255, 150, 45),  // 13: Bright Magenta
+            RgbColor::new(255, 200, 90),  // 14: Bright Cyan
+            RgbColor::new(255, 222, 140), // 15: Bright White
+        ];
+        p
+    }
+
+    /// Beige "paper" background with dark maroon text; palette darkened for a light background
+    pub fn novel(emulation: EmulationType) -> Self {
+        let mut p = Self::midnight_dark(emulation);
+        p.name = format!("Novel ({})", emulation.term_env());
+        p.foreground = RgbColor::new(92, 26, 34);
+        p.background = RgbColor::new(223, 219, 195);
+        p.cursor_color = RgbColor::new(92, 26, 34);
+        p.palette = [
+            RgbColor::new(0, 0, 0),       // 0: Black
+            RgbColor::new(158, 28, 28),   // 1: Red
+            RgbColor::new(38, 102, 28),   // 2: Green
+            RgbColor::new(122, 86, 0),    // 3: Yellow
+            RgbColor::new(30, 58, 140),   // 4: Blue
+            RgbColor::new(122, 36, 112),  // 5: Magenta
+            RgbColor::new(16, 98, 108),   // 6: Cyan
+            RgbColor::new(102, 90, 76),   // 7: White (muted so it stays visible)
+            RgbColor::new(84, 78, 68),    // 8: Bright Black
+            RgbColor::new(178, 44, 36),   // 9: Bright Red
+            RgbColor::new(52, 122, 36),   // 10: Bright Green
+            RgbColor::new(140, 104, 0),   // 11: Bright Yellow
+            RgbColor::new(44, 78, 170),   // 12: Bright Blue
+            RgbColor::new(146, 52, 136),  // 13: Bright Magenta
+            RgbColor::new(24, 116, 126),  // 14: Bright Cyan
+            RgbColor::new(58, 46, 38),    // 15: Bright White (dark so it stays visible)
+        ];
+        p
+    }
+
+    /// Dark ocean-water blue background with white text; palette lightened for a blue background
+    pub fn ocean(emulation: EmulationType) -> Self {
+        let mut p = Self::midnight_dark(emulation);
+        p.name = format!("Ocean ({})", emulation.term_env());
+        p.foreground = RgbColor::new(242, 246, 250);
+        p.background = RgbColor::new(27, 74, 107);
+        p.cursor_color = RgbColor::new(127, 219, 255);
+        p.palette = [
+            RgbColor::new(10, 34, 50),    // 0: Black
+            RgbColor::new(255, 120, 110), // 1: Red
+            RgbColor::new(140, 224, 130), // 2: Green
+            RgbColor::new(242, 214, 110), // 3: Yellow
+            RgbColor::new(150, 196, 255), // 4: Blue
+            RgbColor::new(226, 150, 236), // 5: Magenta
+            RgbColor::new(110, 226, 236), // 6: Cyan
+            RgbColor::new(222, 230, 238), // 7: White
+            RgbColor::new(120, 150, 172), // 8: Bright Black
+            RgbColor::new(255, 150, 140), // 9: Bright Red
+            RgbColor::new(170, 244, 160), // 10: Bright Green
+            RgbColor::new(255, 234, 140), // 11: Bright Yellow
+            RgbColor::new(180, 214, 255), // 12: Bright Blue
+            RgbColor::new(242, 180, 250), // 13: Bright Magenta
+            RgbColor::new(150, 244, 250), // 14: Bright Cyan
+            RgbColor::new(255, 255, 255), // 15: Bright White
+        ];
+        p
+    }
+
     /// Resolve a 256-color index (0..=255) to an RgbColor using this profile's palette
     pub fn color_from_index(&self, idx: u8) -> RgbColor {
         if !self.emulation.supports_ansi_color() {

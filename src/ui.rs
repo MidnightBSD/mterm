@@ -616,17 +616,25 @@ fn build_inline_preferences_bar(app_state: &Rc<RefCell<AppState>>) -> gtk4::Box 
         ("Solarized Dark", TerminalProfile::solarized_dark),
         ("Daylight Light", TerminalProfile::light_theme),
         ("VT100 Green", |_| TerminalProfile::green_phosphor_vt100()),
+        ("Amber", TerminalProfile::amber),
+        ("Novel", TerminalProfile::novel),
+        ("Ocean", TerminalProfile::ocean),
     ];
+    // The last preset clicked; Apply takes its cursor color and ANSI palette, since only the
+    // foreground and background have editable fields.
+    let chosen_preset: Rc<RefCell<Option<TerminalProfile>>> = Rc::new(RefCell::new(None));
     for (label, builder_fn) in presets {
         let p_btn = gtk4::Button::with_label(label);
         let fg_e = fg_entry.clone();
         let bg_e = bg_entry.clone();
         let sel_ref = selected_emu.clone();
+        let chosen = chosen_preset.clone();
         let f = *builder_fn;
         p_btn.connect_clicked(move |_| {
             let p = f(*sel_ref.borrow());
             fg_e.set_text(&p.foreground.to_hex());
             bg_e.set_text(&p.background.to_hex());
+            *chosen.borrow_mut() = Some(p);
         });
         preset_row.append(&p_btn);
     }
@@ -664,6 +672,10 @@ fn build_inline_preferences_bar(app_state: &Rc<RefCell<AppState>>) -> gtk4::Box 
         }
         if let Some(bg) = RgbColor::from_hex(&bg_entry.text()) {
             updated.background = bg;
+        }
+        if let Some(preset) = chosen_preset.borrow_mut().take() {
+            updated.cursor_color = preset.cursor_color;
+            updated.palette = preset.palette;
         }
         updated.scrollback_lines = sb_spin.value() as usize;
         updated.allow_osc52_write = osc_write_chk.is_active();
