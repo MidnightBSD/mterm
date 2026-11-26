@@ -1,23 +1,14 @@
 use crate::profile::EmulationType;
-use std::ffi::{CString, OsString};
+use std::ffi::CString;
 use std::io;
 use std::os::unix::ffi::OsStrExt;
 use std::os::unix::io::RawFd;
-use std::sync::OnceLock;
 use std::sync::mpsc::{self, Receiver};
 use std::thread;
 
-/// The `GTK_IM_MODULE` value the user started us with (main.rs overrides it for our own process).
-static CHILD_GTK_IM_MODULE: OnceLock<Option<OsString>> = OnceLock::new();
-
-/// Record the original `GTK_IM_MODULE` so child shells get it back instead of our override.
-pub fn set_child_gtk_im_module(value: Option<OsString>) {
-    let _ = CHILD_GTK_IM_MODULE.set(value);
-}
-
 /// Build the child's environment (as `KEY=VALUE` C strings) entirely in the parent.
 fn build_child_env(emulation: EmulationType) -> Vec<CString> {
-    const OVERRIDDEN: [&str; 4] = ["TERM", "COLORTERM", "TERM_PROGRAM", "GTK_IM_MODULE"];
+    const OVERRIDDEN: [&str; 3] = ["TERM", "COLORTERM", "TERM_PROGRAM"];
     let mut env: Vec<CString> = std::env::vars_os()
         .filter(|(k, _)| !OVERRIDDEN.iter().any(|o| k.as_bytes() == o.as_bytes()))
         .filter_map(|(k, v)| {
@@ -40,13 +31,6 @@ fn build_child_env(emulation: EmulationType) -> Vec<CString> {
         push("COLORTERM", b"truecolor");
     }
     push("TERM_PROGRAM", b"term-rs");
-    let im = match CHILD_GTK_IM_MODULE.get() {
-        Some(original) => original.clone(),
-        None => std::env::var_os("GTK_IM_MODULE"),
-    };
-    if let Some(im) = im {
-        push("GTK_IM_MODULE", im.as_bytes());
-    }
     env
 }
 
