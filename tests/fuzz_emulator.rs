@@ -1,5 +1,5 @@
-use term::profile::TerminalProfile;
-use term::terminal::TerminalEmulator;
+use mterm::profile::TerminalProfile;
+use mterm::terminal::TerminalEmulator;
 
 struct Rng(u64);
 impl Rng {

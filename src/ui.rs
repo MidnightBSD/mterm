@@ -107,7 +107,7 @@ impl AppState {
                 backend
             ));
             self.window
-                .set_title(Some(&format!("{} — XFCE-Style Rust Terminal", tab.effective_title())));
+                .set_title(Some(&format!("{} — Midnight Terminal", tab.effective_title())));
         }
     }
 }
@@ -778,7 +778,7 @@ fn build_inline_osc52_bar(app_state: &Rc<RefCell<AppState>>) -> gtk4::Box {
     vbox
 }
 
-/// Spawn and attach a new Terminal Tab inside the XFCE-style Notebook
+/// Spawn and attach a new Terminal Tab inside the Notebook
 pub fn create_new_tab(app_state: &Rc<RefCell<AppState>>, profile_override: Option<TerminalProfile>) {
     let (tab_id, profile) = {
         let mut state = app_state.borrow_mut();
@@ -1424,7 +1424,7 @@ pub fn close_tab(app_state: &Rc<RefCell<AppState>>, target_tab: &Rc<RefCell<TabS
     }
 }
 
-/// Build the XFCE-Terminal style menu bar (File, Edit, View, Terminal, Tabs, Help).
+/// Build the Midnight Terminal menu bar (File, Edit, View, Terminal, Tabs, Help).
 /// Menu items trigger `win.*` actions registered on the main window; accelerator labels are
 /// display-only because the terminal's key controller already handles those shortcuts.
 fn build_xfce_menubar(app_state: &Rc<RefCell<AppState>>) -> gtk4::Box {
@@ -1704,11 +1704,11 @@ fn build_xfce_menubar(app_state: &Rc<RefCell<AppState>>) -> gtk4::Box {
     container
 }
 
-/// Build and launch the main XFCE-Terminal style window
+/// Build and launch the main Midnight Terminal window
 pub fn build_ui(app: &gtk4::Application) {
     let window = gtk4::ApplicationWindow::builder()
         .application(app)
-        .title("Terminal — XFCE-Style Rust Terminal")
+        .title("Midnight Terminal")
         .default_width(920)
         .default_height(600)
         .build();

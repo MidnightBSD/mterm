@@ -1,8 +1,8 @@
 [package]
-name = "term"
+name = "mterm"
 version = "0.1.0"
 edition = "2024"
-description = "XFCE-style terminal emulator in Rust with OSC 52 remote copy/paste, profiles, and Unicode support"
+description = "Midnight Terminal: a GTK4 terminal emulator in Rust with OSC 52 remote copy/paste, profiles, and Unicode support"
 
 [dependencies]
 gtk4 = { version = "0.9", features = ["v4_10"] }

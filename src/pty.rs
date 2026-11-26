@@ -30,7 +30,7 @@ fn build_child_env(emulation: EmulationType) -> Vec<CString> {
     if emulation.supports_256_color() {
         push("COLORTERM", b"truecolor");
     }
-    push("TERM_PROGRAM", b"term-rs");
+    push("TERM_PROGRAM", b"mterm");
     env
 }
 

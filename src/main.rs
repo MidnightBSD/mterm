@@ -1,5 +1,5 @@
 use gtk4::prelude::*;
-use term::ui::build_ui;
+use mterm::ui::build_ui;
 
 fn main() -> gtk4::glib::ExitCode {
     if std::env::var_os("GSK_RENDERER").is_none() {
@@ -11,7 +11,7 @@ fn main() -> gtk4::glib::ExitCode {
 
     // GTK must run on the process main thread.
     let app = gtk4::Application::builder()
-        .application_id("org.midnightbsd.xfce_style_term")
+        .application_id("org.midnightbsd.mterm")
         .build();
 
     app.connect_activate(|app| {

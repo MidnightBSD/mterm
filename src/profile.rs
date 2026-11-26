@@ -259,7 +259,7 @@ impl TerminalProfile {
         std::env::var_os("HOME").map(|h| {
             PathBuf::from(h)
                 .join(".config")
-                .join("term")
+                .join("mterm")
                 .join("config.toml")
         })
     }
