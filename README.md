@@ -54,6 +54,23 @@ cargo install --path .
 
 This places `mterm` in `~/.cargo/bin`.
 
+### Desktop menu entry
+
+`data/org.midnightbsd.mterm.desktop` adds Midnight Terminal to desktop
+application menus (under System). It runs `mterm` from your `PATH`. Install
+it system-wide:
+
+```sh
+install -m 644 data/org.midnightbsd.mterm.desktop /usr/local/share/applications/
+update-desktop-database /usr/local/share/applications
+```
+
+or for just your user:
+
+```sh
+install -m 644 data/org.midnightbsd.mterm.desktop ~/.local/share/applications/
+```
+
 Run the tests with:
 
 ```sh

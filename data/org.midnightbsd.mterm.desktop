@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Name=Midnight Terminal
+GenericName=Terminal
+Comment=Use the command line
+Exec=mterm
+TryExec=mterm
+Icon=utilities-terminal
+Terminal=false
+StartupNotify=true
+StartupWMClass=mterm
+Categories=GTK;System;TerminalEmulator;
+Keywords=shell;prompt;command;commandline;cmd;terminal;console;mterm;
