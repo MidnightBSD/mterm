@@ -1424,348 +1424,283 @@ pub fn close_tab(app_state: &Rc<RefCell<AppState>>, target_tab: &Rc<RefCell<TabS
     }
 }
 
-/// Build the XFCE-Terminal inspired Menu Bar (File, Edit, View, Terminal, Tabs, Help)
-/// Uses inline expandable sub-toolbars inside `menubar_container` instead of `GtkPopover`
-/// so GTK 4.24 never spawns secondary X11/Wayland popup `GdkSurface`s.
+/// Build the XFCE-Terminal style menu bar (File, Edit, View, Terminal, Tabs, Help).
+/// Menu items trigger `win.*` actions registered on the main window; accelerator labels are
+/// display-only because the terminal's key controller already handles those shortcuts.
 fn build_xfce_menubar(app_state: &Rc<RefCell<AppState>>) -> gtk4::Box {
-    let container = gtk4::Box::new(gtk4::Orientation::Vertical, 0);
+    use gtk4::gio;
 
-    let bar = gtk4::Box::new(gtk4::Orientation::Horizontal, 4);
-    bar.add_css_class("toolbar");
-    bar.set_margin_top(2);
-    bar.set_margin_bottom(2);
-    bar.set_margin_start(6);
-    bar.set_margin_end(6);
+    let window = app_state.borrow().window.clone();
 
-    let submenus: Rc<RefCell<Vec<gtk4::Box>>> = Rc::new(RefCell::new(Vec::new()));
-
-    let make_menu_section = |label: &str| -> gtk4::Box {
-        let sub_box = gtk4::Box::new(gtk4::Orientation::Horizontal, 6);
-        sub_box.set_margin_top(4);
-        sub_box.set_margin_bottom(4);
-        sub_box.set_margin_start(10);
-        sub_box.set_margin_end(10);
-        sub_box.set_visible(false);
-
-        let btn = gtk4::Button::builder()
-            .label(label)
-            .has_frame(false)
-            .build();
-
-        let sub_ref = sub_box.clone();
-        let all_subs = submenus.clone();
-        btn.connect_clicked(move |_| {
-            let was_visible = sub_ref.is_visible();
-            for s in all_subs.borrow().iter() {
-                s.set_visible(false);
+    // Register a parameterless window action.
+    let add_action = |name: &str, f: Box<dyn Fn()>| {
+        let action = gio::SimpleAction::new(name, None);
+        action.connect_activate(move |_, _| f());
+        window.add_action(&action);
+    };
+    // Register a window action taking the $TERM name of an emulation type.
+    let add_emu_action = |name: &str, f: Box<dyn Fn(EmulationType)>| {
+        let action = gio::SimpleAction::new(name, Some(glib::VariantTy::STRING));
+        action.connect_activate(move |_, param| {
+            let Some(term) = param.and_then(|p| p.get::<String>()) else {
+                return;
+            };
+            if let Some(emu) = EmulationType::all().iter().find(|e| e.term_env() == term) {
+                f(*emu);
             }
-            sub_ref.set_visible(!was_visible);
         });
-
-        bar.append(&btn);
-        container.append(&sub_box);
-        submenus.borrow_mut().push(sub_box.clone());
-        sub_box
+        window.add_action(&action);
     };
 
-    let add_item = |sub_box: &gtk4::Box, text: &str, cb: Box<dyn Fn()>| {
-        let btn = gtk4::Button::builder()
-            .label(text)
-            .build();
-        let sub_ref = sub_box.clone();
-        btn.connect_clicked(move |_| {
-            sub_ref.set_visible(false);
-            cb();
-        });
-        sub_box.append(&btn);
-    };
-
-    // 1. File Menu
-    {
-        let sub = make_menu_section("File");
-        let st1 = app_state.clone();
-        add_item(
-            &sub,
-            "New Tab (Ctrl+Shift+T)",
-            Box::new(move || create_new_tab(&st1, None)),
-        );
-        for emu in EmulationType::all() {
-            let st_e = app_state.clone();
-            let e = *emu;
-            add_item(
-                &sub,
-                &format!("New {} Tab", e.term_env()),
-                Box::new(move || {
-                    let mut prof = st_e.borrow().active_profile.clone();
-                    prof.emulation = e;
-                    prof.name = format!("Profile ({})", e.term_env());
-                    create_new_tab(&st_e, Some(prof));
-                }),
-            );
-        }
-        let st2 = app_state.clone();
-        add_item(
-            &sub,
-            "Close Tab (Ctrl+Shift+W)",
-            Box::new(move || {
-                let cur = st2.borrow().current_tab();
-                if let Some(tab) = cur {
-                    close_tab(&st2, &tab);
-                }
-            }),
-        );
-        let st3 = app_state.clone();
-        add_item(
-            &sub,
-            "Quit",
-            Box::new(move || {
-                st3.borrow().window.close();
-            }),
-        );
-    }
-
-    // 2. Edit Menu
-    {
-        let sub = make_menu_section("Edit");
-        let st1 = app_state.clone();
-        add_item(
-            &sub,
-            "Copy (Ctrl+Shift+C)",
-            Box::new(move || copy_selection_from_current_tab(&st1)),
-        );
-        let st2 = app_state.clone();
-        add_item(
-            &sub,
-            "Paste (Ctrl+Shift+V)",
-            Box::new(move || paste_into_current_tab(&st2, false)),
-        );
-        let st3 = app_state.clone();
-        add_item(
-            &sub,
-            "Paste Primary (Shift+Insert)",
-            Box::new(move || paste_into_current_tab(&st3, true)),
-        );
-        let st4 = app_state.clone();
-        add_item(
-            &sub,
-            "Select All",
-            Box::new(move || {
-                if let Some(tab_rc) = st4.borrow().current_tab() {
-                    let mut tab = tab_rc.borrow_mut();
-                    let total = tab.emulator.total_lines();
-                    let cols = tab.emulator.cols;
-                    tab.emulator.selection_start = Some(GridPoint {
-                        abs_line: 0,
-                        col: 0,
-                    });
-                    tab.emulator.selection_end = Some(GridPoint {
-                        abs_line: total.saturating_sub(1),
-                        col: cols.saturating_sub(1),
-                    });
-                    tab.drawing_area.queue_draw();
-                }
-            }),
-        );
-        let st5 = app_state.clone();
-        add_item(
-            &sub,
-            "Preferences & Profiles",
-            Box::new(move || show_preferences_dialog(&st5)),
-        );
-    }
-
-    // 3. View Menu
-    {
-        let sub = make_menu_section("View");
-        let st1 = app_state.clone();
-        add_item(
-            &sub,
-            "Zoom In (+1 pt)",
-            Box::new(move || {
-                let mut prof = st1.borrow().active_profile.clone();
-                prof.font_size = (prof.font_size + 1.0).min(48.0);
-                apply_profile_to_current_tab(&st1, prof);
-            }),
-        );
-        let st2 = app_state.clone();
-        add_item(
-            &sub,
-            "Zoom Out (-1 pt)",
-            Box::new(move || {
-                let mut prof = st2.borrow().active_profile.clone();
-                prof.font_size = (prof.font_size - 1.0).max(6.0);
-                apply_profile_to_current_tab(&st2, prof);
-            }),
-        );
-        let st3 = app_state.clone();
-        add_item(
-            &sub,
-            &format!("Normal Size ({} pt)", crate::profile::DEFAULT_FONT_SIZE),
-            Box::new(move || {
-                let mut prof = st3.borrow().active_profile.clone();
-                prof.font_size = crate::profile::DEFAULT_FONT_SIZE;
-                apply_profile_to_current_tab(&st3, prof);
-            }),
-        );
-        let st4 = app_state.clone();
-        add_item(
-            &sub,
-            "Toggle Fullscreen (F11)",
-            Box::new(move || {
-                let win = st4.borrow().window.clone();
-                if win.is_fullscreen() {
-                    win.unfullscreen();
-                } else {
-                    win.fullscreen();
-                }
-            }),
-        );
-    }
-
-    // 4. Terminal Menu (Profiles, Emulation, OSC 52, Reset)
-    {
-        let sub = make_menu_section("Terminal");
-        let st_title = app_state.clone();
-        add_item(
-            &sub,
-            "Set Title (Ctrl+Shift+R)",
-            Box::new(move || {
-                let cur = st_title.borrow().current_tab();
-                if let Some(tab) = cur {
-                    show_rename_tab_dialog(&st_title, tab);
-                }
-            }),
-        );
-
-        for emu in EmulationType::all() {
-            let st_p = app_state.clone();
-            let e = *emu;
-            add_item(
-                &sub,
-                &format!("Use {}", e.term_env()),
-                Box::new(move || {
-                    let mut prof = st_p.borrow().active_profile.clone();
-                    prof.emulation = e;
-                    prof.name = format!("Profile ({})", e.term_env());
-                    apply_profile_to_current_tab(&st_p, prof);
-                }),
-            );
-        }
-
-        let st_osc = app_state.clone();
-        add_item(
-            &sub,
-            "OSC 52 Remote Clipboard",
-            Box::new(move || show_osc52_helper_dialog(&st_osc)),
-        );
-
-        let st_reset = app_state.clone();
-        add_item(
-            &sub,
-            "Reset & Clear",
-            Box::new(move || {
-                if let Some(tab_rc) = st_reset.borrow().current_tab() {
-                    let mut tab = tab_rc.borrow_mut();
-                    tab.emulator.process_bytes(b"\x1bc\x1b[3J");
-                    tab.drawing_area.queue_draw();
-                }
-            }),
-        );
-    }
-
-    // 5. Tabs Menu
-    {
-        let sub = make_menu_section("Tabs");
-        let st1 = app_state.clone();
-        add_item(
-            &sub,
-            "Previous Tab (Ctrl+PageUp)",
-            Box::new(move || {
-                let nb = st1.borrow().notebook.clone();
-                if let Some(cur) = nb.current_page() {
-                    if cur > 0 {
-                        nb.set_current_page(Some(cur - 1));
-                    }
-                }
-            }),
-        );
-        let st2 = app_state.clone();
-        add_item(
-            &sub,
-            "Next Tab (Ctrl+PageDown)",
-            Box::new(move || {
-                let nb = st2.borrow().notebook.clone();
-                if let Some(cur) = nb.current_page() {
-                    if cur + 1 < nb.n_pages() {
-                        nb.set_current_page(Some(cur + 1));
-                    }
-                }
-            }),
-        );
-        let st3 = app_state.clone();
-        add_item(
-            &sub,
-            "Rename Tab (Ctrl+Shift+R)",
-            Box::new(move || {
-                let cur = st3.borrow().current_tab();
-                if let Some(tab) = cur {
-                    show_rename_tab_dialog(&st3, tab);
-                }
-            }),
-        );
-    }
-
-    // 6. Help Menu
-    {
-        let sub = make_menu_section("Help");
-        let st1 = app_state.clone();
-        add_item(
-            &sub,
-            "OSC 52 Remote Copy/Paste Guide & Live Test",
-            Box::new(move || show_osc52_helper_dialog(&st1)),
-        );
-    }
-
-    // Quick-action buttons on the right side of the XFCE-style menu bar
-    let spacer = gtk4::Box::new(gtk4::Orientation::Horizontal, 0);
-    spacer.set_hexpand(true);
-    bar.append(&spacer);
-
-    let new_tab_btn = gtk4::Button::builder()
-        .icon_name("tab-new-symbolic")
-        .label("New Tab")
-        .has_frame(false)
-        .build();
-    let st_new = app_state.clone();
-    new_tab_btn.connect_clicked(move |_| {
-        create_new_tab(&st_new, None);
-    });
-    bar.append(&new_tab_btn);
-
-    let rename_bar_btn = gtk4::Button::builder()
-        .label("Rename Tab")
-        .has_frame(false)
-        .build();
-    let st_ren = app_state.clone();
-    rename_bar_btn.connect_clicked(move |_| {
-        let cur = st_ren.borrow().current_tab();
+    // Run a closure on the current tab, if any.
+    fn with_current_tab(st: &Rc<RefCell<AppState>>, f: impl FnOnce(&Rc<RefCell<TabSession>>)) {
+        let cur = st.borrow().current_tab();
         if let Some(tab) = cur {
-            show_rename_tab_dialog(&st_ren, tab);
+            f(&tab);
         }
-    });
-    bar.append(&rename_bar_btn);
+    }
 
-    let prefs_bar_btn = gtk4::Button::builder()
-        .label("Profiles")
-        .has_frame(false)
-        .build();
-    let st_prf = app_state.clone();
-    prefs_bar_btn.connect_clicked(move |_| {
-        show_preferences_dialog(&st_prf);
-    });
-    bar.append(&prefs_bar_btn);
+    fn zoom(st: &Rc<RefCell<AppState>>, f: impl FnOnce(f64) -> f64) {
+        let mut prof = st.borrow().active_profile.clone();
+        prof.font_size = f(prof.font_size).clamp(6.0, 48.0);
+        apply_profile_to_current_tab(st, prof);
+    }
 
-    container.prepend(&bar);
+    fn switch_tab(st: &Rc<RefCell<AppState>>, forward: bool) {
+        let nb = st.borrow().notebook.clone();
+        if let Some(cur) = nb.current_page() {
+            if forward && cur + 1 < nb.n_pages() {
+                nb.set_current_page(Some(cur + 1));
+            } else if !forward && cur > 0 {
+                nb.set_current_page(Some(cur - 1));
+            }
+        }
+    }
+
+    fn profile_for(st: &Rc<RefCell<AppState>>, emu: EmulationType) -> TerminalProfile {
+        let mut prof = st.borrow().active_profile.clone();
+        prof.emulation = emu;
+        prof.name = format!("Profile ({})", emu.term_env());
+        prof
+    }
+
+    // File
+    let st = app_state.clone();
+    add_action("new-tab", Box::new(move || create_new_tab(&st, None)));
+    let st = app_state.clone();
+    add_emu_action(
+        "new-tab-emulation",
+        Box::new(move |emu| create_new_tab(&st, Some(profile_for(&st, emu)))),
+    );
+    let st = app_state.clone();
+    add_action(
+        "close-tab",
+        Box::new(move || with_current_tab(&st, |tab| close_tab(&st, tab))),
+    );
+    let st = app_state.clone();
+    add_action("quit", Box::new(move || st.borrow().window.close()));
+
+    // Edit
+    let st = app_state.clone();
+    add_action("copy", Box::new(move || copy_selection_from_current_tab(&st)));
+    let st = app_state.clone();
+    add_action("paste", Box::new(move || paste_into_current_tab(&st, false)));
+    let st = app_state.clone();
+    add_action(
+        "paste-primary",
+        Box::new(move || paste_into_current_tab(&st, true)),
+    );
+    let st = app_state.clone();
+    add_action(
+        "select-all",
+        Box::new(move || {
+            with_current_tab(&st, |tab_rc| {
+                let mut tab = tab_rc.borrow_mut();
+                let total = tab.emulator.total_lines();
+                let cols = tab.emulator.cols;
+                tab.emulator.selection_start = Some(GridPoint {
+                    abs_line: 0,
+                    col: 0,
+                });
+                tab.emulator.selection_end = Some(GridPoint {
+                    abs_line: total.saturating_sub(1),
+                    col: cols.saturating_sub(1),
+                });
+                tab.drawing_area.queue_draw();
+            })
+        }),
+    );
+    let st = app_state.clone();
+    add_action("preferences", Box::new(move || show_preferences_dialog(&st)));
+
+    // View
+    let st = app_state.clone();
+    add_action("zoom-in", Box::new(move || zoom(&st, |s| s + 1.0)));
+    let st = app_state.clone();
+    add_action("zoom-out", Box::new(move || zoom(&st, |s| s - 1.0)));
+    let st = app_state.clone();
+    add_action(
+        "zoom-reset",
+        Box::new(move || zoom(&st, |_| crate::profile::DEFAULT_FONT_SIZE)),
+    );
+    let st = app_state.clone();
+    add_action(
+        "fullscreen",
+        Box::new(move || {
+            let win = st.borrow().window.clone();
+            if win.is_fullscreen() {
+                win.unfullscreen();
+            } else {
+                win.fullscreen();
+            }
+        }),
+    );
+
+    // Terminal / Tabs / Help
+    let st = app_state.clone();
+    add_action(
+        "rename-tab",
+        Box::new(move || with_current_tab(&st, |tab| show_rename_tab_dialog(&st, tab.clone()))),
+    );
+    let st = app_state.clone();
+    add_emu_action(
+        "use-emulation",
+        Box::new(move |emu| apply_profile_to_current_tab(&st, profile_for(&st, emu))),
+    );
+    let st = app_state.clone();
+    add_action("osc52", Box::new(move || show_osc52_helper_dialog(&st)));
+    let st = app_state.clone();
+    add_action(
+        "reset",
+        Box::new(move || {
+            with_current_tab(&st, |tab_rc| {
+                let mut tab = tab_rc.borrow_mut();
+                tab.emulator.process_bytes(b"\x1bc\x1b[3J");
+                tab.drawing_area.queue_draw();
+            })
+        }),
+    );
+    let st = app_state.clone();
+    add_action("prev-tab", Box::new(move || switch_tab(&st, false)));
+    let st = app_state.clone();
+    add_action("next-tab", Box::new(move || switch_tab(&st, true)));
+
+    // Menu model
+    let item = |label: &str, action: &str, accel: Option<&str>| {
+        let it = gio::MenuItem::new(Some(label), Some(action));
+        if let Some(a) = accel {
+            it.set_attribute_value("accel", Some(&a.to_variant()));
+        }
+        it
+    };
+    let emu_section = |label_prefix: &str, action: &str| {
+        let section = gio::Menu::new();
+        for emu in EmulationType::all() {
+            let it = gio::MenuItem::new(
+                Some(&format!("{label_prefix} {}", emu.term_env())),
+                None,
+            );
+            it.set_action_and_target_value(Some(action), Some(&emu.term_env().to_variant()));
+            section.append_item(&it);
+        }
+        section
+    };
+    let section = |items: &[gio::MenuItem]| {
+        let s = gio::Menu::new();
+        for it in items {
+            s.append_item(it);
+        }
+        s
+    };
+
+    let file = gio::Menu::new();
+    file.append_section(None, &section(&[item("New Tab", "win.new-tab", Some("<Ctrl><Shift>t"))]));
+    file.append_section(None, &emu_section("New", "win.new-tab-emulation"));
+    file.append_section(
+        None,
+        &section(&[
+            item("Close Tab", "win.close-tab", Some("<Ctrl><Shift>w")),
+            item("Quit", "win.quit", None),
+        ]),
+    );
+
+    let edit = gio::Menu::new();
+    edit.append_section(
+        None,
+        &section(&[
+            item("Copy", "win.copy", Some("<Ctrl><Shift>c")),
+            item("Paste", "win.paste", Some("<Ctrl><Shift>v")),
+            item("Paste Selection", "win.paste-primary", Some("<Shift>Insert")),
+            item("Select All", "win.select-all", None),
+        ]),
+    );
+    edit.append_section(
+        None,
+        &section(&[item("Preferences & Profiles", "win.preferences", None)]),
+    );
+
+    let view = gio::Menu::new();
+    view.append_section(
+        None,
+        &section(&[
+            item("Zoom In", "win.zoom-in", None),
+            item("Zoom Out", "win.zoom-out", None),
+            item(
+                &format!("Normal Size ({} pt)", crate::profile::DEFAULT_FONT_SIZE),
+                "win.zoom-reset",
+                None,
+            ),
+        ]),
+    );
+    view.append_section(None, &section(&[item("Fullscreen", "win.fullscreen", None)]));
+
+    let terminal = gio::Menu::new();
+    terminal.append_section(
+        None,
+        &section(&[item("Set Title…", "win.rename-tab", Some("<Ctrl><Shift>r"))]),
+    );
+    terminal.append_section(None, &emu_section("Use", "win.use-emulation"));
+    terminal.append_section(
+        None,
+        &section(&[
+            item("OSC 52 Remote Clipboard…", "win.osc52", None),
+            item("Reset and Clear", "win.reset", None),
+        ]),
+    );
+
+    let tabs = gio::Menu::new();
+    tabs.append_section(
+        None,
+        &section(&[
+            item("Previous Tab", "win.prev-tab", Some("<Ctrl>Page_Up")),
+            item("Next Tab", "win.next-tab", Some("<Ctrl>Page_Down")),
+        ]),
+    );
+    tabs.append_section(
+        None,
+        &section(&[item("Rename Tab…", "win.rename-tab", Some("<Ctrl><Shift>r"))]),
+    );
+
+    let help = gio::Menu::new();
+    help.append_item(&item(
+        "OSC 52 Remote Copy/Paste Guide…",
+        "win.osc52",
+        None,
+    ));
+
+    let model = gio::Menu::new();
+    model.append_submenu(Some("_File"), &file);
+    model.append_submenu(Some("_Edit"), &edit);
+    model.append_submenu(Some("_View"), &view);
+    model.append_submenu(Some("_Terminal"), &terminal);
+    model.append_submenu(Some("T_abs"), &tabs);
+    model.append_submenu(Some("_Help"), &help);
+
+    let menubar = gtk4::PopoverMenuBar::from_model(Some(&model));
+    menubar.set_hexpand(true);
+
+    let container = gtk4::Box::new(gtk4::Orientation::Horizontal, 0);
+    container.append(&menubar);
     container
 }
 
