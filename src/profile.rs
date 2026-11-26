@@ -138,6 +138,137 @@ impl EmulationType {
     }
 }
 
+/// Build an RgbColor from a 0xRRGGBB literal
+const fn hex(v: u32) -> RgbColor {
+    RgbColor::new((v >> 16) as u8, (v >> 8) as u8, v as u8)
+}
+
+/// Optional replacement for a theme's 16 ANSI colors
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub enum AnsiPalette {
+    /// Use the palette tuned for the selected theme
+    #[default]
+    ThemeDefault,
+    MidnightBsdConsole,
+    Tango,
+    XTerm,
+    LinuxConsole,
+    Rxvt,
+    Solarized,
+    Pastel,
+}
+
+impl AnsiPalette {
+    pub fn all() -> &'static [AnsiPalette] {
+        &[
+            AnsiPalette::ThemeDefault,
+            AnsiPalette::MidnightBsdConsole,
+            AnsiPalette::Tango,
+            AnsiPalette::XTerm,
+            AnsiPalette::LinuxConsole,
+            AnsiPalette::Rxvt,
+            AnsiPalette::Solarized,
+            AnsiPalette::Pastel,
+        ]
+    }
+
+    pub fn label(&self) -> &'static str {
+        match self {
+            AnsiPalette::ThemeDefault => "Theme default",
+            AnsiPalette::MidnightBsdConsole => "MidnightBSD Console",
+            AnsiPalette::Tango => "Tango",
+            AnsiPalette::XTerm => "XTerm",
+            AnsiPalette::LinuxConsole => "Linux Console",
+            AnsiPalette::Rxvt => "Rxvt",
+            AnsiPalette::Solarized => "Solarized",
+            AnsiPalette::Pastel => "Pastel",
+        }
+    }
+
+    /// The 16 colors this palette substitutes, or None for the theme's own palette
+    pub fn colors(&self) -> Option<[RgbColor; 16]> {
+        Some(match self {
+            AnsiPalette::ThemeDefault => return None,
+            // MidnightBSD vt(4) console defaults (sys/dev/vt/colors/vt_termcolors.c), converted
+            // from percentages to 0-255 the same way the kernel does (255 * pct / 100).
+            AnsiPalette::MidnightBsdConsole => [
+                RgbColor::new(0, 0, 0),
+                RgbColor::new(127, 0, 0),
+                RgbColor::new(0, 127, 0),
+                RgbColor::new(196, 160, 0),
+                RgbColor::new(51, 102, 163),
+                RgbColor::new(127, 0, 127),
+                RgbColor::new(0, 127, 127),
+                RgbColor::new(191, 191, 191),
+                RgbColor::new(45, 51, 53),
+                RgbColor::new(255, 0, 0),
+                RgbColor::new(0, 255, 0),
+                RgbColor::new(255, 255, 0),
+                RgbColor::new(114, 158, 206),
+                RgbColor::new(255, 0, 255),
+                RgbColor::new(0, 255, 255),
+                RgbColor::new(255, 255, 255),
+            ],
+            // GNOME Tango (same as the Midnight Dark theme)
+            AnsiPalette::Tango => [
+                hex(0x2e3436), hex(0xcc0000), hex(0x4e9a06), hex(0xc4a000),
+                hex(0x3465a4), hex(0x75507b), hex(0x06989a), hex(0xd3d7cf),
+                hex(0x555753), hex(0xef2929), hex(0x8ae234), hex(0xfce94f),
+                hex(0x729fcf), hex(0xad7fa8), hex(0x34e2e2), hex(0xeeeeec),
+            ],
+            AnsiPalette::XTerm => [
+                hex(0x000000), hex(0xcd0000), hex(0x00cd00), hex(0xcdcd00),
+                hex(0x0000cd), hex(0xcd00cd), hex(0x00cdcd), hex(0xe5e5e5),
+                hex(0x7f7f7f), hex(0xff0000), hex(0x00ff00), hex(0xffff00),
+                hex(0x5c5cff), hex(0xff00ff), hex(0x00ffff), hex(0xffffff),
+            ],
+            // Classic VGA text-mode colors
+            AnsiPalette::LinuxConsole => [
+                hex(0x000000), hex(0xaa0000), hex(0x00aa00), hex(0xaa5500),
+                hex(0x0000aa), hex(0xaa00aa), hex(0x00aaaa), hex(0xaaaaaa),
+                hex(0x555555), hex(0xff5555), hex(0x55ff55), hex(0xffff55),
+                hex(0x5555ff), hex(0xff55ff), hex(0x55ffff), hex(0xffffff),
+            ],
+            AnsiPalette::Rxvt => [
+                hex(0x000000), hex(0xcd0000), hex(0x00cd00), hex(0xcdcd00),
+                hex(0x0000cd), hex(0xcd00cd), hex(0x00cdcd), hex(0xfaebd7),
+                hex(0x404040), hex(0xff0000), hex(0x00ff00), hex(0xffff00),
+                hex(0x0000ff), hex(0xff00ff), hex(0x00ffff), hex(0xffffff),
+            ],
+            AnsiPalette::Solarized => [
+                hex(0x073642), hex(0xdc322f), hex(0x859900), hex(0xb58900),
+                hex(0x268bd2), hex(0xd33682), hex(0x2aa198), hex(0xeee8d5),
+                hex(0x002b36), hex(0xcb4b16), hex(0x586e75), hex(0x657b83),
+                hex(0x839496), hex(0x6c71c4), hex(0x93a1a1), hex(0xfdf6e3),
+            ],
+            // xfce4-terminal "Dark Pastels"
+            AnsiPalette::Pastel => [
+                hex(0x3f3f3f), hex(0x705050), hex(0x60b48a), hex(0xdfaf8f),
+                hex(0x9ab8d7), hex(0xdc8cc3), hex(0x8cd0d3), hex(0xdcdcdc),
+                hex(0x709080), hex(0xdca3a3), hex(0x72d5a3), hex(0xf0dfaf),
+                hex(0x94bff3), hex(0xec93d3), hex(0x93e0e3), hex(0xffffff),
+            ],
+        })
+    }
+}
+
+/// WCAG contrast ratio between two colors (1.0 = identical, 21.0 = black on white)
+pub fn contrast_ratio(a: RgbColor, b: RgbColor) -> f64 {
+    fn luminance(c: RgbColor) -> f64 {
+        let ch = |v: u8| {
+            let v = v as f64 / 255.0;
+            if v <= 0.03928 {
+                v / 12.92
+            } else {
+                ((v + 0.055) / 1.055).powf(2.4)
+            }
+        };
+        0.2126 * ch(c.r) + 0.7152 * ch(c.g) + 0.0722 * ch(c.b)
+    }
+    let (la, lb) = (luminance(a), luminance(b));
+    (la.max(lb) + 0.05) / (la.min(lb) + 0.05)
+}
+
 /// Complete Terminal Profile (emulation type, colors, font, OSC 52 permissions, scrollback)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TerminalProfile {
@@ -148,7 +279,11 @@ pub struct TerminalProfile {
     pub foreground: RgbColor,
     pub background: RgbColor,
     pub cursor_color: RgbColor,
+    /// The theme's own 16 ANSI colors
     pub palette: [RgbColor; 16],
+    /// Optional standard palette that replaces `palette`
+    #[serde(default)]
+    pub ansi_palette: AnsiPalette,
     pub scrollback_lines: usize,
     pub allow_osc52_write: bool,
     pub allow_osc52_read: bool,
@@ -194,6 +329,7 @@ impl TerminalProfile {
                 RgbColor::new(52, 226, 226),  // 14: Bright Cyan
                 RgbColor::new(238, 238, 236), // 15: Bright White
             ],
+            ansi_palette: AnsiPalette::ThemeDefault,
             scrollback_lines: 10_000,
             allow_osc52_write: true,
             allow_osc52_read: true,
@@ -311,6 +447,22 @@ impl TerminalProfile {
         p
     }
 
+    /// The 16 ANSI colors in effect: the selected standard palette, or the theme's own
+    pub fn ansi_colors(&self) -> [RgbColor; 16] {
+        self.ansi_palette.colors().unwrap_or(self.palette)
+    }
+
+    /// ANSI color indices that are hard to read on this background (contrast below 2:1;
+    /// some well-liked palettes such as Tango sit between 2.5:1 and 3:1 on dark backgrounds).
+    /// Black (0) and bright black (8) are skipped since they are mostly used as backgrounds
+    /// or for deliberately dim text.
+    pub fn low_contrast_colors(&self) -> Vec<usize> {
+        let colors = self.ansi_colors();
+        (1..16)
+            .filter(|&i| i != 8 && contrast_ratio(colors[i], self.background) < 2.0)
+            .collect()
+    }
+
     /// Resolve a 256-color index (0..=255) to an RgbColor using this profile's palette
     pub fn color_from_index(&self, idx: u8) -> RgbColor {
         if !self.emulation.supports_ansi_color() {
@@ -318,11 +470,11 @@ impl TerminalProfile {
             return self.foreground;
         }
         if idx < 16 {
-            return self.palette[idx as usize];
+            return self.ansi_colors()[idx as usize];
         }
         if !self.emulation.supports_256_color() {
             // Map 16..255 down to basic 16 colors when in 16-color xterm-color mode
-            return self.palette[(idx % 16) as usize];
+            return self.ansi_colors()[(idx % 16) as usize];
         }
         if idx < 232 {
             // 6x6x6 color cube (indices 16..=231)

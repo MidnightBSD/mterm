@@ -1,4 +1,4 @@
-use crate::profile::{EmulationType, RgbColor, TerminalProfile};
+use crate::profile::{AnsiPalette, EmulationType, RgbColor, TerminalProfile};
 use crate::pty::{PtyEvent, PtyHandle};
 use crate::terminal::{GridPoint, Osc52Event, TerminalEmulator, format_osc52_response};
 use gtk4::gdk;
@@ -606,7 +606,77 @@ fn build_inline_preferences_bar(app_state: &Rc<RefCell<AppState>>) -> gtk4::Box 
     osc_read_chk.set_active(current_profile.allow_osc52_read);
     grid.attach(&osc_read_chk, 3, 2, 1, 1);
 
+    // Row 4: ANSI palette override + readability hint
+    let palette_label = gtk4::Label::builder()
+        .label("ANSI Palette:")
+        .halign(gtk4::Align::Start)
+        .build();
+    let palette_names: Vec<&str> = AnsiPalette::all().iter().map(|p| p.label()).collect();
+    let palette_dropdown = gtk4::DropDown::from_strings(&palette_names);
+    let current_palette_idx = AnsiPalette::all()
+        .iter()
+        .position(|p| *p == current_profile.ansi_palette)
+        .unwrap_or(0);
+    palette_dropdown.set_selected(current_palette_idx as u32);
+    let palette_hint = gtk4::Label::builder()
+        .halign(gtk4::Align::Start)
+        .wrap(true)
+        .build();
+    palette_hint.add_css_class("dim-label");
+    grid.attach(&palette_label, 0, 3, 1, 1);
+    grid.attach(&palette_dropdown, 1, 3, 1, 1);
+    grid.attach(&palette_hint, 2, 3, 2, 1);
+
     vbox.append(&grid);
+
+    // The last preset clicked; Apply takes its cursor color and theme palette, since only the
+    // foreground and background have editable fields.
+    let chosen_preset: Rc<RefCell<Option<TerminalProfile>>> = Rc::new(RefCell::new(None));
+
+    // Show which ANSI colors would be hard to read with the chosen palette and background.
+    let update_palette_hint: Rc<dyn Fn()> = {
+        let state = app_state.clone();
+        let bg_e = bg_entry.clone();
+        let dropdown = palette_dropdown.clone();
+        let chosen = chosen_preset.clone();
+        let hint = palette_hint.clone();
+        Rc::new(move || {
+            const NAMES: [&str; 16] = [
+                "black", "red", "green", "yellow", "blue", "magenta", "cyan", "white",
+                "bright black", "bright red", "bright green", "bright yellow", "bright blue",
+                "bright magenta", "bright cyan", "bright white",
+            ];
+            let Ok(st) = state.try_borrow() else {
+                return;
+            };
+            let mut preview = st.active_profile.clone();
+            drop(st);
+            if let Some(ref preset) = *chosen.borrow() {
+                preview.palette = preset.palette;
+            }
+            if let Some(bg) = RgbColor::from_hex(&bg_e.text()) {
+                preview.background = bg;
+            }
+            preview.ansi_palette = AnsiPalette::all()
+                .get(dropdown.selected() as usize)
+                .copied()
+                .unwrap_or_default();
+            let low = preview.low_contrast_colors();
+            if low.is_empty() {
+                hint.set_text("");
+            } else {
+                let names: Vec<&str> = low.iter().map(|&i| NAMES[i]).collect();
+                hint.set_text(&format!("Hard to read on this background: {}", names.join(", ")));
+            }
+        })
+    };
+    {
+        let f = update_palette_hint.clone();
+        palette_dropdown.connect_selected_notify(move |_| f());
+        let f = update_palette_hint.clone();
+        bg_entry.connect_changed(move |_| f());
+    }
+    update_palette_hint();
 
     // Theme preset quick-fill buttons (inline, zero popups)
     let preset_row = gtk4::Box::new(gtk4::Orientation::Horizontal, 6);
@@ -620,21 +690,21 @@ fn build_inline_preferences_bar(app_state: &Rc<RefCell<AppState>>) -> gtk4::Box 
         ("Novel", TerminalProfile::novel),
         ("Ocean", TerminalProfile::ocean),
     ];
-    // The last preset clicked; Apply takes its cursor color and ANSI palette, since only the
-    // foreground and background have editable fields.
-    let chosen_preset: Rc<RefCell<Option<TerminalProfile>>> = Rc::new(RefCell::new(None));
     for (label, builder_fn) in presets {
         let p_btn = gtk4::Button::with_label(label);
         let fg_e = fg_entry.clone();
         let bg_e = bg_entry.clone();
         let sel_ref = selected_emu.clone();
         let chosen = chosen_preset.clone();
+        let refresh_hint = update_palette_hint.clone();
         let f = *builder_fn;
         p_btn.connect_clicked(move |_| {
             let p = f(*sel_ref.borrow());
-            fg_e.set_text(&p.foreground.to_hex());
-            bg_e.set_text(&p.background.to_hex());
+            let (fg, bg) = (p.foreground.to_hex(), p.background.to_hex());
             *chosen.borrow_mut() = Some(p);
+            fg_e.set_text(&fg);
+            bg_e.set_text(&bg);
+            refresh_hint();
         });
         preset_row.append(&p_btn);
     }
@@ -677,6 +747,10 @@ fn build_inline_preferences_bar(app_state: &Rc<RefCell<AppState>>) -> gtk4::Box 
             updated.cursor_color = preset.cursor_color;
             updated.palette = preset.palette;
         }
+        updated.ansi_palette = AnsiPalette::all()
+            .get(palette_dropdown.selected() as usize)
+            .copied()
+            .unwrap_or_default();
         updated.scrollback_lines = sb_spin.value() as usize;
         updated.allow_osc52_write = osc_write_chk.is_active();
         updated.allow_osc52_read = osc_read_chk.is_active();

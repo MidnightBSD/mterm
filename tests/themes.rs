@@ -1,17 +1,4 @@
-use mterm::profile::{EmulationType, RgbColor, TerminalProfile};
-
-fn luminance(c: RgbColor) -> f64 {
-    let ch = |v: u8| {
-        let v = v as f64 / 255.0;
-        if v <= 0.03928 { v / 12.92 } else { ((v + 0.055) / 1.055).powf(2.4) }
-    };
-    0.2126 * ch(c.r) + 0.7152 * ch(c.g) + 0.0722 * ch(c.b)
-}
-
-fn contrast(a: RgbColor, b: RgbColor) -> f64 {
-    let (la, lb) = (luminance(a), luminance(b));
-    (la.max(lb) + 0.05) / (la.min(lb) + 0.05)
-}
+use mterm::profile::{EmulationType, TerminalProfile, contrast_ratio as contrast};
 
 #[test]
 fn new_themes_are_readable() {
