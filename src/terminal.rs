@@ -1744,7 +1744,7 @@ mod tests {
 
     #[test]
     fn test_osc52_write_and_query() {
-        let profile = TerminalProfile::xfce_dark(EmulationType::Xterm256Color);
+        let profile = TerminalProfile::midnight_dark(EmulationType::Xterm256Color);
         let mut term = TerminalEmulator::new(80, 24, profile);
 
         // Remote app sends OSC 52 write ("Hello Remote World!" base64 = SGVsbG8gUmVtb3RlIFdvcmxkIQ==)
@@ -1809,12 +1809,12 @@ mod tests {
 
     #[test]
     fn test_profile_device_attributes_and_colors() {
-        let vt100_profile = TerminalProfile::xfce_dark(EmulationType::Vt100);
+        let vt100_profile = TerminalProfile::midnight_dark(EmulationType::Vt100);
         let mut vt100 = TerminalEmulator::new(80, 24, vt100_profile);
         vt100.process_bytes(b"\x1b[c");
         assert_eq!(vt100.pty_write_queue, b"\x1b[?1;2c");
 
-        let xterm_profile = TerminalProfile::xfce_dark(EmulationType::Xterm256Color);
+        let xterm_profile = TerminalProfile::midnight_dark(EmulationType::Xterm256Color);
         let mut xterm = TerminalEmulator::new(80, 24, xterm_profile);
         xterm.process_bytes(b"\x1b[c");
         assert_eq!(xterm.pty_write_queue, b"\x1b[?62;1;2;6;7;8;9;15;22c");
@@ -1822,7 +1822,7 @@ mod tests {
 
     #[test]
     fn test_sgr_colors_and_dec_line_drawing() {
-        let profile = TerminalProfile::xfce_dark(EmulationType::Xterm256Color);
+        let profile = TerminalProfile::midnight_dark(EmulationType::Xterm256Color);
         let mut term = TerminalEmulator::new(40, 10, profile);
 
         // 24-bit RGB foreground (38;2;10;20;30) and 256-color background (48;5;208)
@@ -1842,7 +1842,7 @@ mod tests {
 
     #[test]
     fn test_alt_screen_and_scrollback_selection() {
-        let profile = TerminalProfile::xfce_dark(EmulationType::Xterm);
+        let profile = TerminalProfile::midnight_dark(EmulationType::Xterm);
         let mut term = TerminalEmulator::new(10, 3, profile);
 
         term.process_bytes(b"Line1\r\nLine2\r\nLine3\r\nLine4");

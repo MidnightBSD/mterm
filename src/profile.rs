@@ -156,7 +156,7 @@ pub struct TerminalProfile {
 
 impl Default for TerminalProfile {
     fn default() -> Self {
-        Self::xfce_dark(EmulationType::Xterm256Color)
+        Self::midnight_dark(EmulationType::Xterm256Color)
     }
 }
 
@@ -164,8 +164,8 @@ impl Default for TerminalProfile {
 pub const DEFAULT_FONT_SIZE: f64 = 13.0;
 
 impl TerminalProfile {
-    /// Default XFCE-Terminal inspired dark profile
-    pub fn xfce_dark(emulation: EmulationType) -> Self {
+    /// Default Midnight Dark profile
+    pub fn midnight_dark(emulation: EmulationType) -> Self {
         Self {
             name: format!("Default ({})", emulation.term_env()),
             emulation,
@@ -175,7 +175,7 @@ impl TerminalProfile {
             background: RgbColor::new(24, 26, 31),
             cursor_color: RgbColor::new(82, 139, 255),
             palette: [
-                // Normal 0..7 (Tango / XFCE dark inspired)
+                // Normal 0..7 (Tango-based)
                 RgbColor::new(46, 52, 54),    // 0: Black
                 RgbColor::new(204, 0, 0),     // 1: Red
                 RgbColor::new(78, 154, 6),    // 2: Green
@@ -201,7 +201,7 @@ impl TerminalProfile {
     }
 
     pub fn solarized_dark(emulation: EmulationType) -> Self {
-        let mut p = Self::xfce_dark(emulation);
+        let mut p = Self::midnight_dark(emulation);
         p.name = format!("Solarized Dark ({})", emulation.term_env());
         p.foreground = RgbColor::new(131, 148, 150);
         p.background = RgbColor::new(0, 43, 54);
@@ -210,7 +210,7 @@ impl TerminalProfile {
     }
 
     pub fn light_theme(emulation: EmulationType) -> Self {
-        let mut p = Self::xfce_dark(emulation);
+        let mut p = Self::midnight_dark(emulation);
         p.name = format!("Light ({})", emulation.term_env());
         p.foreground = RgbColor::new(30, 34, 42);
         p.background = RgbColor::new(250, 250, 250);
@@ -219,7 +219,7 @@ impl TerminalProfile {
     }
 
     pub fn green_phosphor_vt100() -> Self {
-        let mut p = Self::xfce_dark(EmulationType::Vt100);
+        let mut p = Self::midnight_dark(EmulationType::Vt100);
         p.name = "DEC VT100 Green Phosphor".to_string();
         p.foreground = RgbColor::new(51, 255, 51);
         p.background = RgbColor::new(10, 20, 10);

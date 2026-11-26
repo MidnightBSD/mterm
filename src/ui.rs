@@ -612,7 +612,7 @@ fn build_inline_preferences_bar(app_state: &Rc<RefCell<AppState>>) -> gtk4::Box 
     let preset_row = gtk4::Box::new(gtk4::Orientation::Horizontal, 6);
     preset_row.append(&gtk4::Label::new(Some("Color Presets:")));
     let presets: &[(&str, fn(EmulationType) -> TerminalProfile)] = &[
-        ("XFCE Dark", TerminalProfile::xfce_dark),
+        ("Midnight Dark", TerminalProfile::midnight_dark),
         ("Solarized Dark", TerminalProfile::solarized_dark),
         ("Daylight Light", TerminalProfile::light_theme),
         ("VT100 Green", |_| TerminalProfile::green_phosphor_vt100()),
@@ -1097,7 +1097,7 @@ pub fn create_new_tab(app_state: &Rc<RefCell<AppState>>, profile_override: Optio
             let shift = modifier.contains(gdk::ModifierType::SHIFT_MASK);
             let alt = modifier.contains(gdk::ModifierType::ALT_MASK);
 
-            // XFCE Terminal Shortcuts:
+            // Keyboard shortcuts:
             // Ctrl+Shift+T: New Tab
             // Ctrl+Shift+W: Close Tab
             // Ctrl+Shift+C: Copy
@@ -1427,7 +1427,7 @@ pub fn close_tab(app_state: &Rc<RefCell<AppState>>, target_tab: &Rc<RefCell<TabS
 /// Build the Midnight Terminal menu bar (File, Edit, View, Terminal, Tabs, Help).
 /// Menu items trigger `win.*` actions registered on the main window; accelerator labels are
 /// display-only because the terminal's key controller already handles those shortcuts.
-fn build_xfce_menubar(app_state: &Rc<RefCell<AppState>>) -> gtk4::Box {
+fn build_menubar(app_state: &Rc<RefCell<AppState>>) -> gtk4::Box {
     use gtk4::gio;
 
     let window = app_state.borrow().window.clone();
@@ -1758,7 +1758,7 @@ pub fn build_ui(app: &gtk4::Application) {
         osc52_bar: placeholder_osc52,
     }));
 
-    let menubar = build_xfce_menubar(&app_state);
+    let menubar = build_menubar(&app_state);
     let (rename_bar, rename_entry) = build_inline_rename_bar(&app_state);
     let prefs_bar = build_inline_preferences_bar(&app_state);
     let osc52_bar = build_inline_osc52_bar(&app_state);
