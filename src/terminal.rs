@@ -275,6 +275,8 @@ pub struct TerminalEmulator {
     pub application_keypad: bool,
     pub bracketed_paste_mode: bool,
     pub newline_mode: bool,
+    mouse_tracking_mode: Option<u16>,
+    sgr_mouse: bool,
 
     // DEC Special Graphics line-drawing character sets (G0 / G1)
     pub charset_g0_line_drawing: bool,
@@ -334,6 +336,8 @@ impl TerminalEmulator {
             application_keypad: false,
             bracketed_paste_mode: false,
             newline_mode: false,
+            mouse_tracking_mode: None,
+            sgr_mouse: false,
             charset_g0_line_drawing: false,
             charset_g1_line_drawing: false,
             active_charset_g1: false,
@@ -788,6 +792,29 @@ impl TerminalEmulator {
         self.pending_wrap = false;
     }
 
+    pub fn encode_mouse_wheel(
+        &self,
+        up: bool,
+        row: usize,
+        col: usize,
+        modifiers: u8,
+    ) -> Option<Vec<u8>> {
+        if self.mouse_tracking_mode.is_none() || self.display_offset != 0 {
+            return None;
+        }
+
+        let button = (if up { 64 } else { 65 }) | (modifiers & 0x1c);
+        let x = col.min(self.cols - 1) + 1;
+        let y = row.min(self.rows - 1) + 1;
+        if self.sgr_mouse {
+            Some(format!("\x1b[<{button};{x};{y}M").into_bytes())
+        } else if x <= 223 && y <= 223 {
+            Some(vec![0x1b, b'[', b'M', button + 32, x as u8 + 32, y as u8 + 32])
+        } else {
+            None
+        }
+    }
+
     fn full_reset(&mut self) {
         let blank = CellAttrs::default();
         self.current_attrs = blank;
@@ -809,6 +836,8 @@ impl TerminalEmulator {
         self.application_cursor_keys = false;
         self.application_keypad = false;
         self.bracketed_paste_mode = false;
+        self.mouse_tracking_mode = None;
+        self.sgr_mouse = false;
         self.charset_g0_line_drawing = false;
         self.charset_g1_line_drawing = false;
         self.active_charset_g1 = false;
@@ -1297,6 +1326,14 @@ impl TerminalEmulator {
                             self.exit_alt_screen(false);
                         }
                     }
+                    1000 | 1002 | 1003 => {
+                        if set {
+                            self.mouse_tracking_mode = Some(mode);
+                        } else if self.mouse_tracking_mode == Some(mode) {
+                            self.mouse_tracking_mode = None;
+                        }
+                    }
+                    1006 => self.sgr_mouse = set,
                     1048 => {
                         if set {
                             if self.alt_screen_active {
@@ -1741,6 +1778,45 @@ impl TerminalEmulator {
 mod tests {
     use super::*;
     use crate::profile::{EmulationType, TerminalProfile};
+
+    #[test]
+    fn test_mouse_wheel_reporting_modes() {
+        let profile = TerminalProfile::midnight_dark(EmulationType::Xterm256Color);
+        let mut term = TerminalEmulator::new(240, 24, profile);
+        term.process_bytes(b"\x1b[?1049h\x1b[?1006h");
+        assert_eq!(term.encode_mouse_wheel(true, 2, 4, 0), None);
+
+        for mode in [1000, 1002, 1003] {
+            term.process_bytes(format!("\x1b[?{mode}h").as_bytes());
+            assert_eq!(
+                term.encode_mouse_wheel(true, 2, 4, 0).as_deref(),
+                Some(b"\x1b[<64;5;3M".as_slice())
+            );
+            assert_eq!(
+                term.encode_mouse_wheel(false, 99, 999, 28).as_deref(),
+                Some(b"\x1b[<93;240;24M".as_slice())
+            );
+            term.process_bytes(format!("\x1b[?{mode}l").as_bytes());
+            assert_eq!(term.encode_mouse_wheel(false, 2, 4, 0), None);
+        }
+
+        term.process_bytes(b"\x1b[?1049l\x1b[?1006l\x1b[?1000h");
+        assert_eq!(
+            term.encode_mouse_wheel(false, 2, 4, 0).as_deref(),
+            Some(b"\x1b[Ma%#".as_slice())
+        );
+        assert_eq!(term.encode_mouse_wheel(true, 0, 223, 0), None);
+        term.display_offset = 1;
+        assert_eq!(term.encode_mouse_wheel(true, 0, 0, 0), None);
+        term.display_offset = 0;
+        term.process_bytes(b"\x1b[?1006h\x1bc\x1b[?1000h");
+        assert_eq!(
+            term.encode_mouse_wheel(true, 0, 0, 0).as_deref(),
+            Some(b"\x1b[M`!!".as_slice())
+        );
+        term.process_bytes(b"\x1bc");
+        assert_eq!(term.encode_mouse_wheel(true, 0, 0, 0), None);
+    }
 
     #[test]
     fn test_osc52_write_and_query() {

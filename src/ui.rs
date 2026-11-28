@@ -1355,11 +1355,46 @@ pub fn create_new_tab(app_state: &Rc<RefCell<AppState>>, profile_override: Optio
 
     // Mouse wheel scroll controller
     {
-        let scroll_controller =
-            gtk4::EventControllerScroll::new(gtk4::EventControllerScrollFlags::VERTICAL);
+        let scroll_controller = gtk4::EventControllerScroll::new(
+            gtk4::EventControllerScrollFlags::VERTICAL | gtk4::EventControllerScrollFlags::DISCRETE,
+        );
         let tab_scroll = session.clone();
-        scroll_controller.connect_scroll(move |_, _dx, dy| {
+        scroll_controller.connect_scroll(move |controller, _dx, dy| {
+            if dy == 0.0 {
+                return glib::Propagation::Proceed;
+            }
+
             let mut tab = tab_scroll.borrow_mut();
+            if let Some(event) = controller.current_event()
+                && let Some(native) = tab.drawing_area.native()
+                && let Some((surface_x, surface_y)) = event.position().or_else(|| {
+                    // Scroll events may omit coordinates. Query the scrolling device.
+                    let (x, y, _) = native.surface()?.device_position(&event.device()?)?;
+                    Some((x, y))
+                })
+            {
+                let (offset_x, offset_y) = native.surface_transform();
+                let point = gtk4::graphene::Point::new(
+                    (surface_x + offset_x) as f32,
+                    (surface_y + offset_y) as f32,
+                );
+                if let Some(point) = native.compute_point(&tab.drawing_area, &point) {
+                    let col = (f64::from(point.x()) / tab.cell_width) as usize;
+                    let row = (f64::from(point.y()) / tab.cell_height) as usize;
+                    let state = event.modifier_state();
+                    let modifiers = (u8::from(state.contains(gdk::ModifierType::SHIFT_MASK)) << 2)
+                        | (u8::from(state.contains(gdk::ModifierType::ALT_MASK)) << 3)
+                        | (u8::from(state.contains(gdk::ModifierType::CONTROL_MASK)) << 4);
+                    if let Some(report) =
+                        tab.emulator.encode_mouse_wheel(dy < 0.0, row, col, modifiers)
+                    {
+                        for _ in 0..dy.abs() as usize {
+                            let _ = tab.pty.write_all(&report);
+                        }
+                        return glib::Propagation::Stop;
+                    }
+                }
+            }
             if tab.emulator.alt_screen_active {
                 return glib::Propagation::Proceed;
             }
