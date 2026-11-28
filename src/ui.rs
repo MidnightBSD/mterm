@@ -1830,6 +1830,7 @@ pub fn build_ui(app: &gtk4::Application) {
     let window = gtk4::ApplicationWindow::builder()
         .application(app)
         .title("Midnight Terminal")
+        .icon_name("org.midnightbsd.mterm")
         .default_width(920)
         .default_height(600)
         .build();

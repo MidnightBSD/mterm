@@ -58,17 +58,24 @@ This places `mterm` in `~/.cargo/bin`.
 
 `data/org.midnightbsd.mterm.desktop` adds Midnight Terminal to desktop
 application menus (under System). It runs `mterm` from your `PATH`. Install
-it system-wide:
+the desktop entry and icon system-wide:
 
 ```sh
+install -d /usr/local/share/applications /usr/local/share/icons/hicolor/256x256/apps
 install -m 644 data/org.midnightbsd.mterm.desktop /usr/local/share/applications/
+install -m 644 data/icons/hicolor/256x256/apps/org.midnightbsd.mterm.png \
+    /usr/local/share/icons/hicolor/256x256/apps/
 update-desktop-database /usr/local/share/applications
 ```
 
 or for just your user:
 
 ```sh
-install -m 644 data/org.midnightbsd.mterm.desktop ~/.local/share/applications/
+data_home="${XDG_DATA_HOME:-$HOME/.local/share}"
+install -d "$data_home/applications" "$data_home/icons/hicolor/256x256/apps"
+install -m 644 data/org.midnightbsd.mterm.desktop "$data_home/applications/"
+install -m 644 data/icons/hicolor/256x256/apps/org.midnightbsd.mterm.png \
+    "$data_home/icons/hicolor/256x256/apps/"
 ```
 
 Run the tests with:
