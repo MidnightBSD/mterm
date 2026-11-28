@@ -24,6 +24,7 @@ pub struct TabSession {
     pub cell_width: f64,
     pub cell_height: f64,
     pub is_selecting: bool,
+    pub last_pointer_position: Option<(f64, f64)>,
     pub syncing_scrollbar: bool,
     pub exited: bool,
 }
@@ -946,6 +947,7 @@ pub fn create_new_tab(app_state: &Rc<RefCell<AppState>>, profile_override: Optio
         cell_width,
         cell_height,
         is_selecting: false,
+        last_pointer_position: None,
         syncing_scrollbar: false,
         exited: false,
     }));
@@ -1339,6 +1341,7 @@ pub fn create_new_tab(app_state: &Rc<RefCell<AppState>>, profile_override: Optio
         let tab_motion = session.clone();
         motion_controller.connect_motion(move |_, x, y| {
             let mut tab = tab_motion.borrow_mut();
+            tab.last_pointer_position = Some((x, y));
             if !tab.is_selecting {
                 return;
             }
@@ -1349,6 +1352,14 @@ pub fn create_new_tab(app_state: &Rc<RefCell<AppState>>, profile_override: Optio
             let (_, abs_line) = tab.emulator.visible_row(view_row);
             tab.emulator.selection_end = Some(GridPoint { abs_line, col });
             tab.drawing_area.queue_draw();
+        });
+        let tab_enter = session.clone();
+        motion_controller.connect_enter(move |_, x, y| {
+            tab_enter.borrow_mut().last_pointer_position = Some((x, y));
+        });
+        let tab_leave = session.clone();
+        motion_controller.connect_leave(move |_| {
+            tab_leave.borrow_mut().last_pointer_position = None;
         });
         drawing_area.add_controller(motion_controller);
     }
@@ -1365,22 +1376,24 @@ pub fn create_new_tab(app_state: &Rc<RefCell<AppState>>, profile_override: Optio
             }
 
             let mut tab = tab_scroll.borrow_mut();
-            if let Some(event) = controller.current_event()
-                && let Some(native) = tab.drawing_area.native()
-                && let Some((surface_x, surface_y)) = event.position().or_else(|| {
-                    // Scroll events may omit coordinates. Query the scrolling device.
-                    let (x, y, _) = native.surface()?.device_position(&event.device()?)?;
-                    Some((x, y))
-                })
-            {
-                let (offset_x, offset_y) = native.surface_transform();
-                let point = gtk4::graphene::Point::new(
-                    (surface_x + offset_x) as f32,
-                    (surface_y + offset_y) as f32,
-                );
-                if let Some(point) = native.compute_point(&tab.drawing_area, &point) {
-                    let col = (f64::from(point.x()) / tab.cell_width) as usize;
-                    let row = (f64::from(point.y()) / tab.cell_height) as usize;
+            if let Some(event) = controller.current_event() {
+                let position = event
+                    .position()
+                    .and_then(|(surface_x, surface_y)| {
+                        let native = tab.drawing_area.native()?;
+                        let (offset_x, offset_y) = native.surface_transform();
+                        let point = gtk4::graphene::Point::new(
+                            (surface_x + offset_x) as f32,
+                            (surface_y + offset_y) as f32,
+                        );
+                        native
+                            .compute_point(&tab.drawing_area, &point)
+                            .map(|p| (f64::from(p.x()), f64::from(p.y())))
+                    })
+                    .or(tab.last_pointer_position);
+                if let Some((x, y)) = position {
+                    let col = (x.max(0.0) / tab.cell_width) as usize;
+                    let row = (y.max(0.0) / tab.cell_height) as usize;
                     let state = event.modifier_state();
                     let modifiers = (u8::from(state.contains(gdk::ModifierType::SHIFT_MASK)) << 2)
                         | (u8::from(state.contains(gdk::ModifierType::ALT_MASK)) << 3)
